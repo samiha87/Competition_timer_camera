@@ -6,6 +6,8 @@ import time
 import cv2
 import os
 import array as arr
+import threading
+from Queue import Queue
 
 # Find frames
 def movement_detect(video_path, video_type, rotate):
@@ -88,7 +90,7 @@ def movement_detect(video_path, video_type, rotate):
 						print("Captured time: " + str(time.time() - rider_time) + " seconds")
 						timer_running = False
 						cv2.waitKey(1000)
-						return;
+						return
 					else:
 						print("Person detected, Starting timer")
 						frames_detected = 0
@@ -121,8 +123,6 @@ def movement_detect(video_path, video_type, rotate):
 					for d in range(3) :
 						pixel_memory[y][x][d] = original[y][x][d]
 						captured_pixels = captured_pixels + 1
-					#print(pixel_memory[x][y])
-			#cv2.imshow("stored frame", pixel_memory)
 			print("Starting detection, captured pixels: " + str(captured_pixels))
 			detection_on = True
 		if k == 27:
@@ -165,6 +165,16 @@ def color_detect(video_path, video_type):
 # Yolo
 def_confidence = 2
 def_threshold = 2
+# Start reading from 2 sources
+def yolo_detect_both(video_path_start, video_path_end, video_type):
+	startThread = threading.Thread(target=yolo_detect, args=(video_path_start, video_type))
+	endThread = threading.Thread(target=yolo_detect, args=(video_path_end, video_type))
+
+	# Start star gate thread
+	startThread.start()
+	# Start end gate thread
+	endThread.start()
+
 
 def yolo_detect(video_path, video_type):
 # load the COCO class labels our YOLO model was trained on
@@ -276,17 +286,17 @@ def yolo_detect(video_path, video_type):
 							print("Person crossed start ", Detection_count)
 							start = time.time()
 							block_gate = True
-							block_gate_timer = time.time();
+							block_gate_timer = time.time()
 							print("Timer started")
 							timer_running = True
 						else:
 							timer_running = False
 							print("Timer stopped")
-							stop = time.time();
+							stop = time.time()
 							elap = (stop - start)
 							print("Time elapsed {:.4f} seconds".format(elap))
 							block_gate = True
-							block_gate_timer = time.time();
+							block_gate_timer = time.time()
 					print("")
 
 					# Detect if person collides wit start line
