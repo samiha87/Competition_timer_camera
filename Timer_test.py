@@ -16,8 +16,6 @@ ap.add_argument("-r", "--rotate", required=False, help="Rotate image")
 args = vars(ap.parse_args())
 
 if args["type"] == "yolo":
-	#thread1 = threading.Thread(target = yolo_detect, args = (args["input"], args["mode"]))
-	#thread1.start()
 	yolo_detect(args["input"], args["mode"])
 if args["type"] == "color":
 	color_detect(args["input"], args["mode"])
@@ -26,6 +24,3 @@ if args["type"] == "movement":
 		movement_detect(args["input"], args["mode"], True)
 	else :
 		movement_detect(args["input"], args["mode"], False)
-#thread2.start()
-#
-#yolo_detect("videos/end.mp4", "end")
