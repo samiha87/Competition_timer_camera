@@ -8,6 +8,7 @@ import os
 import array as arr
 import threading
 from Queue import Queue
+from yolo_detect import YoloDetector
 
 # Find frames
 def movement_detect(video_path, video_type, rotate):
@@ -167,15 +168,26 @@ def_confidence = 2
 def_threshold = 2
 # Start reading from 2 sources
 def yolo_detect_both(video_path_start, video_path_end, video_type):
-	startThread = threading.Thread(target=yolo_detect, args=(video_path_start, video_type))
-	endThread = threading.Thread(target=yolo_detect, args=(video_path_end, video_type))
+	# Initialize Queue
+	print("yolo_detect_both() Start source: " + video_path_start)
+	print("yolo_detect_both() End source: " + video_path_end)
+	if video_type != "both":
+		print("yolo_detect_both() Wrong type " + video_type)
+		return
 
+	queue_start = Queue(maxsize = 5)	# Set max size to 5
+	queue_end = Queue(maxsize = 5)
+	# Create a lock
+	lock = threading.Lock()
+	# Create threads, First queue input is to transmit, second to read
+	startThread = YoloDetector(lock, video_path_start, "start", queue_end, queue_start)
+	endThread	= YoloDetector(lock, video_path_end, "end", queue_start, queue_end)
 	# Start star gate thread
-	startThread.start()
-	# Start end gate thread
 	endThread.start()
-
-
+	startThread.start()
+	#time.sleep(30)	# Wait for 30s
+	# Start end gate thread
+	
 def yolo_detect(video_path, video_type):
 # load the COCO class labels our YOLO model was trained on
 	labelsPath = os.path.sep.join(["yolo_files", "coco.names"])
@@ -197,8 +209,9 @@ def yolo_detect(video_path, video_type):
 
 	# initialize the video stream, pointer to output video file, and
 	# frame dimensions
+	print("Reading video file " + video_type)
 	vs = cv2.VideoCapture(video_path)	# Read video
-
+	print("Reading video file read" + video_type)
 	# Get dimensions from video start footage
 	video_width = vs.get(cv2.CAP_PROP_FRAME_WIDTH)
 	video_height = vs.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -212,7 +225,7 @@ def yolo_detect(video_path, video_type):
 
 	block_gate = False
 	timer_running = False
-
+	print("Starting detection " + video_type)
 	while True:
 		# read the next frame from the file
 		(grabbed, frame) = vs.read()
