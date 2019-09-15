@@ -15,7 +15,9 @@ ap.add_argument("-s", "--inputstart", 	required=True, 		help="Select input for s
 ap.add_argument("-e", "--inputend",		required=True,		help="Select input for end gate")
 ap.add_argument("-t", "--type", 		required=True, 		help="Set detection type")
 ap.add_argument("-r", "--rotate", 		required=False, 	help="Rotate image")
+ap.add_argument("-a", "--translate",	nargs='+',			required=False,						help="Translate is used to shift image")
 args = vars(ap.parse_args())
+
 
 if args["type"] == "yolo":
 
@@ -24,7 +26,7 @@ if args["type"] == "yolo":
 		yolo_detect_both(args["inputstart"], args["inputend"], args["mode"], args["rotate"])
 
 	if args["mode"] == "start":
-		yolo_detect(args["inputstart"], args["mode"]) 
+		yolo_detect(args["inputstart"], args["mode"], args["rotate"], args["translate"]) 
 
 if args["type"] == "color":
 	color_detect(args["input"], args["mode"])

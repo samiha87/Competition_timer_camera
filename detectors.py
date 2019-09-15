@@ -187,8 +187,14 @@ def yolo_detect_both(video_path_start, video_path_end, video_type):
 	startThread.start()
 	#time.sleep(30)	# Wait for 30s
 	# Start end gate thread
-	
-def yolo_detect(video_path, video_type):
+
+def translateImage(image, offsetx, offsety):
+	rows, cols = image.shape[:2]
+	M = np.float32([[1,0,offsetx], [0,1,offsety]])
+	dst = cv2.warpAffine(image, M, (cols,rows))
+	return dst
+
+def yolo_detect(video_path, video_type, rotate, shift):
 # load the COCO class labels our YOLO model was trained on
 	labelsPath = os.path.sep.join(["yolo_files", "coco.names"])
 	LABELS = open(labelsPath).read().strip().split("\n")
@@ -229,7 +235,9 @@ def yolo_detect(video_path, video_type):
 	while True:
 		# read the next frame from the file
 		(grabbed, frame) = vs.read()
+		
 		frame_count = frame_count + 1
+		print("Frame count: " + str(frame_count))
 		if(frame_count >= Process_frame):
 			# if the frame was not grabbed, then we have reached the end
 			# of the stream
@@ -239,6 +247,18 @@ def yolo_detect(video_path, video_type):
 			# if the frame dimensions are empty, grab them
 			if W is None or H is None:
 				(H, W) = frame.shape[:2]
+
+			if rotate:
+				#Rotate image
+				center = (W / 2, H /2)
+				M = cv2.getRotationMatrix2D(center, float(rotate), 1)
+				frame = cv2.warpAffine(frame, M, (H, W))
+
+			if shift:
+				#Translate image to center
+				frame = translateImage(frame, shift[0], shift[1])
+
+				# Shift the image to left
 			blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 			net.setInput(blob)
 
@@ -313,9 +333,13 @@ def yolo_detect(video_path, video_type):
 					print("")
 
 					# Detect if person collides wit start line
-		cv2.line(frame, (320, 1), (320, int(video_height)), (0, 255, 0), 2)
-		cv2.imshow(video_type, frame)
-		cv2.waitKey(1)
+		# get Heigh and width
+		(H_, W_) = frame.shape[:2]	
+		# Draw line middle of frame
+		if frame_count > 5:
+			cv2.line(frame, (W_/2, 1), (W_/2, H_), (0, 255, 0), 2)
+			cv2.imshow(video_type, frame)
+			cv2.waitKey(1)
 			# release the file pointers
 	print("[INFO] cleaning up...")
 	writer.release()
