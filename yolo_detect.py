@@ -9,7 +9,7 @@ import threading
 from Queue import Queue
 
 class YoloDetector (threading.Thread):
-    def __init__(self, lock, path, vType, qin, qout, rotate):
+    def __init__(self, lock, path, vType, yolo, qin, qout, rotate):
         threading.Thread.__init__(self)
         self.lock = lock
         self.path = path
@@ -17,23 +17,24 @@ class YoloDetector (threading.Thread):
         self.qin = qin
         self.qout = qout
         self.rotation = rotate
+        self.yolo = yolo
 
     def run(self):
-        yolo_detect_start(self, self.path, self.vType, self.qin, self.qout)
+        yolo_detect_start(self, self.path, self.vType, self.yolo, self.qin, self.qout)
 
-def yolo_detect_start(self, video_path, video_type, queue_input, queue_output):
+def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_output):
     # load the COCO class labels our YOLO model was trained o
     def_confidence = 2
     def_threshold = 2
-    labelsPath = os.path.sep.join(["yolo_files", "coco.names"])
+    labelsPath = os.path.sep.join([yolo, "coco.names"])
     LABELS = open(labelsPath).read().strip().split("\n")
 	# initialize a list of colors to represent each possible class label
     np.random.seed(42)
     COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
 
 	# derive the paths to the YOLO weights and model configuration
-    weightsPath = os.path.sep.join(["yolo_files/", "yolov3.weights"])
-    configPath = os.path.sep.join(["yolo_files", "yolov3.cfg"])
+    weightsPath = os.path.sep.join([yolo, "yolov3.weights"])
+    configPath = os.path.sep.join([yolo, "yolov3.cfg"])
 
     # load our YOLO object detector trained on COCO dataset (80 classes)
 	# and determine only the *output* layer names that we need from YOLO
@@ -93,6 +94,7 @@ def yolo_detect_start(self, video_path, video_type, queue_input, queue_output):
                     scores = detection[5:]
                     classID = np.argmax(scores)
                     confidence = scores[classID]
+                    print(classID)
 				    # filter out weak predictions by ensuring the detected
 				    # probability is greater than the minimum probability
                     if confidence > def_confidence:
@@ -108,6 +110,7 @@ def yolo_detect_start(self, video_path, video_type, queue_input, queue_output):
                         boxes.append([x, y, int(width), int(height)])
                         confidences.append(float(confidence))
                         classIDs.append(classID)
+                        
 			# apply non-maxima suppression to suppress weak, overlapping
 		    # bounding boxes
             idxs = cv2.dnn.NMSBoxes(boxes, confidences, def_confidence, def_threshold)

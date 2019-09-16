@@ -167,7 +167,7 @@ def color_detect(video_path, video_type):
 def_confidence = 2
 def_threshold = 2
 # Start reading from 2 sources
-def yolo_detect_both(video_path_start, video_path_end, video_type):
+def yolo_detect_both(video_path_start, video_path_end, video_type, yolo):
 	# Initialize Queue
 	print("yolo_detect_both() Start source: " + video_path_start)
 	print("yolo_detect_both() End source: " + video_path_end)
@@ -194,9 +194,9 @@ def translateImage(image, offsetx, offsety):
 	dst = cv2.warpAffine(image, M, (cols,rows))
 	return dst
 
-def yolo_detect(video_path, video_type, rotate, shift):
+def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, treshold_lim):
 # load the COCO class labels our YOLO model was trained on
-	labelsPath = os.path.sep.join(["yolo_files", "coco.names"])
+	labelsPath = os.path.sep.join([yolo, "coco.names"])
 	LABELS = open(labelsPath).read().strip().split("\n")
 
 	# initialize a list of colors to represent each possible class label
@@ -204,8 +204,8 @@ def yolo_detect(video_path, video_type, rotate, shift):
 	COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
 
 	# derive the paths to the YOLO weights and model configuration
-	weightsPath = os.path.sep.join(["yolo_files/", "yolov3.weights"])
-	configPath = os.path.sep.join(["yolo_files", "yolov3.cfg"])
+	weightsPath = os.path.sep.join([yolo, "yolov3.weights"])
+	configPath = os.path.sep.join([yolo, "yolov3.cfg"])
 
 	# load our YOLO object detector trained on COCO dataset (80 classes)
 	# and determine only the *output* layer names that we need from YOLO
@@ -226,7 +226,7 @@ def yolo_detect(video_path, video_type, rotate, shift):
 	(W, H) = (None, None)
 
 	Detection_count = 1
-	Process_frame = 10
+	Process_frame = 2
 	frame_count = 0
 
 	block_gate = False
@@ -243,7 +243,7 @@ def yolo_detect(video_path, video_type, rotate, shift):
 			# of the stream
 			if not grabbed:
 				break
-
+			frame_count = 0
 			# if the frame dimensions are empty, grab them
 			if W is None or H is None:
 				(H, W) = frame.shape[:2]
@@ -258,7 +258,6 @@ def yolo_detect(video_path, video_type, rotate, shift):
 				#Translate image to center
 				frame = translateImage(frame, shift[0], shift[1])
 
-				# Shift the image to left
 			blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 			net.setInput(blob)
 
@@ -282,7 +281,7 @@ def yolo_detect(video_path, video_type, rotate, shift):
 					confidence = scores[classID]
 					# filter out weak predictions by ensuring the detected
 					# probability is greater than the minimum probability
-					if confidence > def_confidence:
+					if confidence > confidence_lim:
 						# scale the bounding box coordinates back relative to
 						# the size of the image, keeping in mind that YOLO
 						# actually returns the center (x, y)-coordinates of
@@ -303,7 +302,7 @@ def yolo_detect(video_path, video_type, rotate, shift):
 
 			# apply non-maxima suppression to suppress weak, overlapping
 			# bounding boxes
-			idxs = cv2.dnn.NMSBoxes(boxes, confidences, def_confidence, def_threshold)
+			idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence_lim, treshold_lim)
 			if(block_gate and ( (time.time() - block_gate_timer) > 5)) :
 				block_gate = False
 			# ensure at least one detection exists
@@ -314,6 +313,8 @@ def yolo_detect(video_path, video_type, rotate, shift):
 					(x, y) = (boxes[i][0], boxes[i][1])
 					(w, h) = (boxes[i][2], boxes[i][3])
 					Detection_count = Detection_count + 1
+					text = "{}: {:.4f}".format(LABELS[classIDs[i]], confidences[i])
+					print(text)
 					if (x < W/2) and ( (x + w) > W/2):
 						if(timer_running == False) :
 							print("Person crossed start ", Detection_count)
@@ -336,11 +337,11 @@ def yolo_detect(video_path, video_type, rotate, shift):
 		# get Heigh and width
 		(H_, W_) = frame.shape[:2]	
 		# Draw line middle of frame
-		if frame_count > 5:
-			cv2.line(frame, (W_/2, 1), (W_/2, H_), (0, 255, 0), 2)
-			cv2.imshow(video_type, frame)
-			cv2.waitKey(1)
-			# release the file pointers
+		
+		cv2.line(frame, (W_/2, 1), (W_/2, H_), (0, 255, 0), 2)
+		cv2.imshow(video_type, frame)
+		cv2.waitKey(1)
+		# release the file pointers
 	print("[INFO] cleaning up...")
 	writer.release()
 	vs.release()
