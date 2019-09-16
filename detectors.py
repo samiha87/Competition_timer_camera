@@ -194,7 +194,7 @@ def translateImage(image, offsetx, offsety):
 	dst = cv2.warpAffine(image, M, (cols,rows))
 	return dst
 
-def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, treshold_lim):
+def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, treshold_lim, frame_rate):
 # load the COCO class labels our YOLO model was trained on
 	labelsPath = os.path.sep.join([yolo, "coco.names"])
 	LABELS = open(labelsPath).read().strip().split("\n")
@@ -226,7 +226,7 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 	(W, H) = (None, None)
 
 	Detection_count = 1
-	Process_frame = 2
+	Process_frame = frame_rate
 	frame_count = 0
 
 	block_gate = False
@@ -243,20 +243,17 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 			# of the stream
 			if not grabbed:
 				break
-			frame_count = 0
 			# if the frame dimensions are empty, grab them
 			if W is None or H is None:
 				(H, W) = frame.shape[:2]
 
-			if rotate:
-				#Rotate image
-				center = (W / 2, H /2)
-				M = cv2.getRotationMatrix2D(center, float(rotate), 1)
-				frame = cv2.warpAffine(frame, M, (H, W))
+			#Rotate image
+			center = (W / 2, H /2)
+			M = cv2.getRotationMatrix2D(center, float(rotate), 1)
+			frame = cv2.warpAffine(frame, M, (H, W))
 
-			if shift:
-				#Translate image to center
-				frame = translateImage(frame, shift[0], shift[1])
+			#Translate image to center
+			frame = translateImage(frame, shift[0], shift[1])
 
 			blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 			net.setInput(blob)
@@ -287,6 +284,7 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 						# actually returns the center (x, y)-coordinates of
 						# the bounding box followed by the boxes' width and
 						# height
+						(H, W) = frame.shape[:2]
 						box = detection[0:4] * np.array([W, H, W, H])
 						(centerX, centerY, width, height) = box.astype("int")
 						# use the center (x, y)-coordinates to derive the top
@@ -337,10 +335,11 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 		# get Heigh and width
 		(H_, W_) = frame.shape[:2]	
 		# Draw line middle of frame
-		
-		cv2.line(frame, (W_/2, 1), (W_/2, H_), (0, 255, 0), 2)
-		cv2.imshow(video_type, frame)
-		cv2.waitKey(1)
+		if frame_count >= frame_rate:
+			cv2.line(frame, (W_/2, 1), (W_/2, H_), (0, 255, 0), 2)
+			cv2.imshow(video_type, frame)
+			cv2.waitKey(1)
+			frame_count = 0
 		# release the file pointers
 	print("[INFO] cleaning up...")
 	writer.release()
