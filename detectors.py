@@ -164,10 +164,8 @@ def color_detect(video_path, video_type):
 		if k == 27:
 			break
 # Yolo
-def_confidence = 2
-def_threshold = 2
 # Start reading from 2 sources
-def yolo_detect_both(video_path_start, video_path_end, video_type, yolo):
+def yolo_detect_both(video_path_start, video_path_end, video_type, yolo, rotate, shift, confidence_lim, treshold_lim, frame_rate):
 	# Initialize Queue
 	print("yolo_detect_both() Start source: " + video_path_start)
 	print("yolo_detect_both() End source: " + video_path_end)
@@ -175,18 +173,22 @@ def yolo_detect_both(video_path_start, video_path_end, video_type, yolo):
 		print("yolo_detect_both() Wrong type " + video_type)
 		return
 
-	queue_start = Queue(maxsize = 5)	# Set max size to 5
-	queue_end = Queue(maxsize = 5)
+	queue_start = Queue()
+	queue_end = Queue()
 	# Create a lock
 	lock = threading.Lock()
 	# Create threads, First queue input is to transmit, second to read
-	startThread = YoloDetector(lock, video_path_start, "start", queue_end, queue_start)
-	endThread	= YoloDetector(lock, video_path_end, "end", queue_start, queue_end)
-	# Start star gate thread
-	endThread.start()
+	startThread = YoloDetector(lock, video_path_start, "start", yolo, queue_end, queue_start, rotate, shift, confidence_lim, treshold_lim, frame_rate)
+	endThread	= YoloDetector(lock, video_path_end, "end", yolo, queue_start, queue_end, rotate, shift, confidence_lim, treshold_lim, frame_rate)
+	# Start monitoring end gate
 	startThread.start()
-	#time.sleep(30)	# Wait for 30s
-	# Start end gate thread
+	time.sleep(10)
+	# Start monitoring start gate
+	endThread.start()
+	# Join queue
+	queue_start.join()
+	queue_end.join()
+	
 
 def translateImage(image, offsetx, offsety):
 	rows, cols = image.shape[:2]
@@ -233,6 +235,7 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 	timer_running = False
 	print("Starting detection " + video_type)
 	while True:
+		
 		# read the next frame from the file
 		(grabbed, frame) = vs.read()
 		
@@ -252,7 +255,7 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 			M = cv2.getRotationMatrix2D(center, float(rotate), 1)
 			frame = cv2.warpAffine(frame, M, (H, W))
 
-			#Translate image to center
+			#Translate image 
 			frame = translateImage(frame, shift[0], shift[1])
 
 			blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
@@ -284,17 +287,18 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 						# actually returns the center (x, y)-coordinates of
 						# the bounding box followed by the boxes' width and
 						# height
-						(H, W) = frame.shape[:2]
-						box = detection[0:4] * np.array([W, H, W, H])
-						(centerX, centerY, width, height) = box.astype("int")
+					
+						(Hd, Wd) = frame.shape[:2]
+						box = detection[0:4] * np.array([Wd, Hd, Wd, Hd])
+						(centerXd, centerYd, widthd, heightd) = box.astype("int")
 						# use the center (x, y)-coordinates to derive the top
 						# and and left corner of the bounding box
-						x = int(centerX - (width / 2))
-						y = int(centerY - (height / 2))
+						x = int(centerXd - (widthd / 2))
+						y = int(centerYd - (heightd / 2))
 
 						# update our list of bounding box coordinates,
 						# confidences, and class IDs
-						boxes.append([x, y, int(width), int(height)])
+						boxes.append([x, y, int(widthd), int(heightd)])
 						confidences.append(float(confidence))
 						classIDs.append(classID)
 
@@ -304,6 +308,7 @@ def yolo_detect(video_path, video_type, yolo, rotate, shift, confidence_lim, tre
 			if(block_gate and ( (time.time() - block_gate_timer) > 5)) :
 				block_gate = False
 			# ensure at least one detection exists
+			
 			if (len(idxs) > 0 and (block_gate == False)):
 				# loop over the indexes we are keeping
 				for i in idxs.flatten():

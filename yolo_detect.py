@@ -9,7 +9,7 @@ import threading
 from Queue import Queue
 
 class YoloDetector (threading.Thread):
-    def __init__(self, lock, path, vType, yolo, qin, qout, rotate):
+    def __init__(self, lock, path, vType, yolo, qin, qout, rotate, shift, confidence_lim, treshold_lim, frame_rate):
         threading.Thread.__init__(self)
         self.lock = lock
         self.path = path
@@ -18,14 +18,23 @@ class YoloDetector (threading.Thread):
         self.qout = qout
         self.rotation = rotate
         self.yolo = yolo
+        self.shift = shift
+        self.confidence_lim = confidence_lim
+        self.treshold_lim = treshold_lim
+        self.frame_rate = frame_rate
 
     def run(self):
-        yolo_detect_start(self, self.path, self.vType, self.yolo, self.qin, self.qout)
+        yolo_detect_start(self, self.path, self.vType, self.yolo, self.qin, self.qout, self.rotation, self.shift, self.confidence_lim, self.treshold_lim, self.frame_rate)
 
-def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_output):
+def translateImage(image, offsetx, offsety):
+	rows, cols = image.shape[:2]
+	M = np.float32([[1,0,offsetx], [0,1,offsety]])
+	dst = cv2.warpAffine(image, M, (cols,rows))
+	return dst
+
+def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_output, rotate, shift, confidence_lim, treshold_lim, frame_rate):
     # load the COCO class labels our YOLO model was trained o
-    def_confidence = 2
-    def_threshold = 2
+    print(video_type + " Treshold " + str(confidence_lim))
     labelsPath = os.path.sep.join([yolo, "coco.names"])
     LABELS = open(labelsPath).read().strip().split("\n")
 	# initialize a list of colors to represent each possible class label
@@ -55,14 +64,27 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
     (W, H) = (None, None)
 
     Detection_count = 1
-    Process_frame = 10
+    Process_frame = frame_rate
     frame_count = 0
 
     block_gate = False
     timer_running = False
+    # Init timers
+    start = 0
+    end = 0
+
     print("Starting detection " + video_type)
     while True:
-            # read the next frame from the file
+        #check queue if we have message from another thread
+        try:
+            thread_data = queue_input.get(False)
+            if thread_data:
+                # Queue requires a string format, convert back from string to float
+                start = float(thread_data)  
+                timer_running = True
+        except:
+            thread_data = None
+        # read the next frame from the file
         (grabbed, frame) = vs.read()
         frame_count = frame_count + 1
         if(frame_count >= Process_frame):
@@ -75,11 +97,20 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
             if W is None or H is None:
     		    (H, W) = frame.shape[:2]
             
+            #Rotate image
+            center = (W / 2, H /2)
+            M = cv2.getRotationMatrix2D(center, float(rotate), 1)
+            frame = cv2.warpAffine(frame, M, (H, W))
+
+            #Translate image 
+            frame = translateImage(frame, shift[0], shift[1])
+            
             blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
             net.setInput(blob)
 
             layerOutputs = net.forward(ln)
             end = time.time()
+
             # initialize our lists of detected bounding boxes, confidences, and class IDs, respectively
             boxes = []
             confidences = []
@@ -94,54 +125,54 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                     scores = detection[5:]
                     classID = np.argmax(scores)
                     confidence = scores[classID]
-                    print(classID)
 				    # filter out weak predictions by ensuring the detected
-				    # probability is greater than the minimum probability
-                    if confidence > def_confidence:
-                        # scale the bounding box coordinates back relative to the size of the image, keeping in mind that YOLO
-                        # actually returns the center (x, y)-coordinates of the bounding box followed by the boxes' width and height
-                        box = detection[0:4] * np.array([W, H, W, H])
-                        (centerX, centerY, width, height) = box.astype("int")
-					    # use the center (x, y)-coordinates to derive the top and and left corner of the bounding box
-                        x = int(centerX - (width / 2))
-                        y = int(centerY - (height / 2))
+				    # probability is greater than the treshold probability
+                    if confidence > confidence_lim:
+                        (Hd, Wd) = frame.shape[:2]
+                        box = detection[0:4] * np.array([Wd, Hd, Wd, Hd])
+                        (centerXd, centerYd, widthd, heightd) = box.astype("int")
+                        x = int(centerXd - (widthd / 2))
+                        y = int(centerYd - (heightd / 2))
 
-					    # update our list of bounding box coordinateframe_counts, confidences, and class IDs
-                        boxes.append([x, y, int(width), int(height)])
+                        boxes.append([x, y, int(widthd), int(heightd)])
                         confidences.append(float(confidence))
                         classIDs.append(classID)
                         
 			# apply non-maxima suppression to suppress weak, overlapping
 		    # bounding boxes
-            idxs = cv2.dnn.NMSBoxes(boxes, confidences, def_confidence, def_threshold)
-            if(block_gate and ( (time.time() - block_gate_timer) > 5)) :
+            idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence_lim, treshold_lim)
+            if(block_gate and ( (time.time() - block_gate_timer) > 5)):
                 block_gate = False
 		    # ensure at least one detection exists
             if (len(idxs) > 0 and (block_gate == False)):
 				# loop over the indexes we are keeping
                 for i in idxs.flatten():
 				    # extract the bounding box coordinates
+                    (H, W) = frame.shape[:2]
                     (x, y) = (boxes[i][0], boxes[i][1])
                     (w, h) = (boxes[i][2], boxes[i][3])
                     Detection_count = Detection_count + 1
                     if (x < W/2) and ( (x + w) > W/2):
-                        if(timer_running == False) :
+                        if(video_type is "start") :
                             print("Person crossed start ", Detection_count)
-                            start = time.time()
-                            block_gate = True
-                            block_gate_timer = time.time() 
-                            print("Timer started")
-                            timer_running = True
-                        else:
-                            timer_running = False
+                            # Send start time to end gate
+                            queue_output.put(str(time.time()))
+
+                        if video_type is "end":
                             print("Timer stopped")
-                            stop = time.time()
-                            elap = (stop - start)
-                            print("Time elapsed {:.4f} seconds".format(elap))
-                            block_gate = True
-                            block_gate_timer = time.time()
-                    print("")
-        print("Processing fame "+ str(frame_count) + " for " + video_type)
+                            if timer_running is True:
+                                stop = time.time()
+                                elap = (stop - start)
+                                print("Time elapsed {:.4f} seconds".format(elap))
+                                timer_running = False
+        # get Heigh and width
+        if frame  is not None:
+            (H_, W_) = frame.shape[:2]	
+        # Draw line middle of frame
+        if frame_count >= frame_rate:
+            frame_count = 0
+		# release the file pointers
     print("[INFO] cleaning up...")
-    writer.release()
+    if writer is not None:
+        writer.release()
     vs.release()

@@ -27,7 +27,7 @@ if args["type"] == "yolo":
 
 	if args["mode"] == "both":
 		#start yolo detector for start gate in thread
-		yolo_detect_both(args["inputstart"], args["inputend"], args["mode"], args["yolo"], args["rotate"])
+		yolo_detect_both(args["inputstart"], args["inputend"], args["mode"], args["yolo"], args["rotate"], args["translate"], args["confidence"], args["treshold"], args["framerate"])
 
 	if args["mode"] == "start":
 		yolo_detect(args["inputstart"], args["mode"], args["yolo"], args["rotate"], args["translate"], args["confidence"], args["treshold"], args["framerate"]) 
