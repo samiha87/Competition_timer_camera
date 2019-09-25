@@ -10,6 +10,9 @@ import threading
 import queue
 from yolo_detect import YoloDetector
 
+startFrame = None
+endFrame = None
+
 # Find frames
 def movement_detect(video_path, video_type, rotate):
 	object_treshold = 0.10
@@ -164,6 +167,13 @@ def color_detect(video_path, video_type):
 		if k == 27:
 			break
 # Yolo
+
+def getLatestStartFrame():
+	return
+
+def getLatestEndFrame():
+	return
+
 # Start reading from 2 sources
 def yolo_detect_both(video_path_start, video_path_end, video_type, yolo, rotate, shift, confidence_lim, treshold_lim, frame_rate):
 	# Initialize Queue
@@ -175,6 +185,7 @@ def yolo_detect_both(video_path_start, video_path_end, video_type, yolo, rotate,
 
 	queue_start = queue.Queue()
 	queue_end = queue.Queue()
+
 	# Create a lock
 	lock = threading.Lock()
 	# Create threads, First queue input is to transmit, second to read
@@ -188,7 +199,6 @@ def yolo_detect_both(video_path_start, video_path_end, video_type, yolo, rotate,
 	# Join queue
 	queue_start.join()
 	queue_end.join()
-	
 
 def translateImage(image, offsetx, offsety):
 	rows, cols = image.shape[:2]

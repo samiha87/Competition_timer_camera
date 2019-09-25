@@ -3,9 +3,9 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLay
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5 import QtCore
 from PyQt5.QtCore import QObject
-from detectors import yolo_detect_both
-class App():
+from detectors import yolo_detect_both, getLatestEndFrame, getLatestStartFrame
 
+class App():
     def __init__(self):
         super().__init__()
         self.title = 'PyQt for timing'
@@ -17,13 +17,22 @@ class App():
         self.widget = QWidget()
         self.pixmapStart = None
         self.pixmapEnd = None
-    def updateStream(self, pathStart, pathEnd):
-        if pathStart:
-            self.pixmapStart.Load(pathStart)
-            print("updateStream: start")
-        if pathEnd:
-            self.pixmapEnd.Load(pathEnd)
-            print("updateStream: end")
+        self.labelEnd = None
+        self.labelStart = None
+        self.videoTimer = QtCore.QTimer()
+
+        #Init signals
+        self.videoTimer.timeout.connect(self.updateStream)
+
+    def updateStream(self):
+        self.pixmapEnd.load("buffer/bufferend.jpg")
+        self.pixmapStart.load("buffer/bufferstart.jpg")
+
+        self.pixmapEnd = self.pixmapEnd.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        self.labelEnd.setPixmap(self.pixmapEnd)    
+  
+        self.pixmapStart = self.pixmapStart.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        self.labelStart.setPixmap(self.pixmapStart)
 
     def start(self):
 
@@ -39,26 +48,28 @@ class App():
         startButton = QPushButton('Start')
         stopButton = QPushButton('End')
         exitButton = QPushButton('Exit')
+
         # Signals
         startButton.clicked.connect(self.bStart_clicked)
         stopButton.clicked.connect(self.bStop_clicked)
         exitButton.clicked.connect(self.bExit_clicked)
+
         # Create Start and Stop windows
-        labelStart = QLabel()
-        labelEnd = QLabel()
-
-        pixmapStart = QPixmap('buffer/startFrame.jpg')
-        pixmapEnd = QPixmap('buffer/endFrame.jpg')
+        self.labelStart = QLabel()
+        self.labelEnd = QLabel()
+        self.pixmapStart = QPixmap('buffer/startFrame.jpg')
+        self.pixmapEnd = QPixmap('buffer/endFrame.jpg')
         # Scale start frame
-        pixmapStart = pixmapStart.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        self.pixmapStart = self.pixmapStart.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
         # Scale end frame
-        pixmapEnd = pixmapEnd.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        self.pixmapEnd = self.pixmapEnd.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
 
-        labelStart.setPixmap(pixmapStart)
-        labelEnd.setPixmap(pixmapEnd)
+        self.labelStart.setPixmap(self.pixmapStart)
+        self.labelEnd.setPixmap(self.pixmapEnd)
 
-        layoutVideo.addWidget(labelStart)
-        layoutVideo.addWidget(labelEnd)
+        # Set widgets for layouts
+        layoutVideo.addWidget(self.labelStart)
+        layoutVideo.addWidget(self.labelEnd)
 
         layoutButton.addWidget(startButton)
         layoutButton.addWidget(stopButton)
@@ -76,7 +87,9 @@ class App():
 
     def bStart_clicked(self):
         print("Button 1 clicked")
-        yolo_detect_both("videos/start_sample.mp4", "videos/end_sample.mp4", "both", "yolo-coco", 270, [-200, 10], 0.5, 0.3, 5)
+        # Set frame rate to 25fps -> 40ms 
+        self.videoTimer.start(40)   
+        yolo_detect_both("videos/start_sample.mp4", "videos/start_sample.mp4", "both", "yolo-coco", 270, [-200, 10], 0.5, 0.3, 5)
 
     def bStop_clicked(self):    
         print("Button 2 clicked")

@@ -25,7 +25,6 @@ ap.add_argument("-g", "--gui",			dest='gui',			action='store_true', 					help="S
 args = vars(ap.parse_args())
 
 
-
 if args["gui"]:
 		print("Start GUI")
 		# Init GUI

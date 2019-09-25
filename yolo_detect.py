@@ -7,6 +7,8 @@ import os
 import array as arr
 import threading
 import queue
+import sys
+
 
 class YoloDetector (threading.Thread):
     def __init__(self, lock, path, vType, yolo, qin, qout, rotate, shift, confidence_lim, treshold_lim, frame_rate):
@@ -25,12 +27,17 @@ class YoloDetector (threading.Thread):
 
     def run(self):
         yolo_detect_start(self, self.path, self.vType, self.yolo, self.qin, self.qout, self.rotation, self.shift, self.confidence_lim, self.treshold_lim, self.frame_rate)
+        self.is_alive = False
+        sys.exit()
 
 def translateImage(image, offsetx, offsety):
 	rows, cols = image.get().shape[:2]
 	M = np.float32([[1,0,offsetx], [0,1,offsety]])
 	dst = cv2.warpAffine(image, M, (cols,rows))
 	return dst
+
+def storeFile(image, path) :
+    cv2.imwrite(path, image, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
 
 def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_output, rotate, shift, confidence_lim, treshold_lim, frame_rate):
     # load the COCO class labels our YOLO model was trained o
@@ -55,7 +62,6 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 	    # frame dimensions
     print("Reading video file " + video_type)
     vs = cv2.VideoCapture(video_path)	# Read video
-    print("Reading video file read" + video_type)
 	    # Get dimensions from video start footage
     video_width = vs.get(cv2.CAP_PROP_FRAME_WIDTH)
     video_height = vs.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -171,14 +177,13 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                                 elap = (stop - start)
                                 print("Time elapsed {:.4f} seconds".format(elap))
                                 timer_running = False
-        # get Heigh and width
-        #if frameGPU is not None:
-        #    (H_, W_) = frameGPU.get().shape[:2]	
-        # Draw line middle of frame
+  
         if frame_count >= frame_rate:
             frame_count = 0
+            path = "buffer/buffer" + video_type + ".jpg"
+            storeFile(frameGPU, path)
 		# release the file pointers
-    print("[INFO] cleaning up...")
+    print("Detection ended for " + video_type)
     if writer is not None:
         writer.release()
     vs.release()
