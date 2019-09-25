@@ -1,6 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5 import QtCore
 
 class App():
 
@@ -18,6 +19,7 @@ class App():
 
         self.widget.setWindowTitle(self.title)
         self.widget.setGeometry(self.left, self.top, self.width, self.height)
+
         # Create layout
         layoutMain = QVBoxLayout()
         layoutVideo = QHBoxLayout()
@@ -27,12 +29,17 @@ class App():
         startButton = QPushButton('Start')
         stopButton = QPushButton('End')
         exitButton = QPushButton('Exit')
+
         # Create Start and Stop windows
         labelStart = QLabel()
         labelEnd = QLabel()
 
-        pixmapStart = QPixmap('startFrame.jpeg')
-        pixmapEnd = QPixmap('startEnd.jpeg')
+        pixmapStart = QPixmap('buffer/startFrame.jpg')
+        pixmapEnd = QPixmap('buffer/endFrame.jpg')
+        # Scale start frame
+        pixmapStart = pixmapStart.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        # Scale end frame
+        pixmapEnd = pixmapEnd.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
 
         labelStart.setPixmap(pixmapStart)
         labelEnd.setPixmap(pixmapEnd)
