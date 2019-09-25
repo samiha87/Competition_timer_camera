@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5 import QtCore
+from PyQt5.QtCore import QObject
 
 class App():
 
@@ -12,9 +13,19 @@ class App():
         self.top = 10
         self.width = 640
         self.height = 480
-        self.gui = QApplication([])
+        self.gui = QApplication(sys.argv)
         self.widget = QWidget()
+        self.pixmapStart = None
+        self.pixmapEnd = None
     
+    def updateStream(self, pathStart, pathEnd):
+        if pathStart:
+            self.pixmapStart.Load(pathStart)
+            print("updateStream: start")
+        if pathEnd:
+            self.pixmapEnd.Load(pathEnd)
+            print("updateStream: end")
+
     def start(self):
 
         self.widget.setWindowTitle(self.title)
@@ -29,7 +40,10 @@ class App():
         startButton = QPushButton('Start')
         stopButton = QPushButton('End')
         exitButton = QPushButton('Exit')
-
+        # Signals
+        startButton.clicked.connect(self.bStart_clicked)
+        stopButton.clicked.connect(self.bStop_clicked)
+        exitButton.clicked.connect(self.bExit_clicked)
         # Create Start and Stop windows
         labelStart = QLabel()
         labelEnd = QLabel()
@@ -59,4 +73,14 @@ class App():
         screenHeight = 800
         self.widget.resize(screenWidth, screenHeight)
         self.widget.show()
-        self.gui.exec_()
+        sys.exit(self.gui.exec_())
+
+    def bStart_clicked(self):
+        print("Button 1 clicked")
+
+    def bStop_clicked(self):    
+        print("Button 2 clicked")
+
+    def bExit_clicked(self):
+        print("Exit program")
+        self.gui.quit()

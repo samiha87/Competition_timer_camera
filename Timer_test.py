@@ -43,5 +43,10 @@ if args["type"] == "movement":
 
 # Init GUI
 gui = App()
-# Start gui
-gui.start()
+
+if __name__ == '__main__':
+	# Start gui
+	gui.start()
+	print("Gui Started")
+	# Update stream
+	gui.updateStream("buffer/startFrame2.jpg", "buffer/endFrame2.jpg")
