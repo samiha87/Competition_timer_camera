@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLay
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5 import QtCore
 from PyQt5.QtCore import QObject
-
+from detectors import yolo_detect_both
 class App():
 
     def __init__(self):
@@ -17,7 +17,6 @@ class App():
         self.widget = QWidget()
         self.pixmapStart = None
         self.pixmapEnd = None
-    
     def updateStream(self, pathStart, pathEnd):
         if pathStart:
             self.pixmapStart.Load(pathStart)
@@ -77,6 +76,7 @@ class App():
 
     def bStart_clicked(self):
         print("Button 1 clicked")
+        yolo_detect_both("videos/start_sample.mp4", "videos/end_sample.mp4", "both", "yolo-coco", 270, [-200, 10], 0.5, 0.3, 5)
 
     def bStop_clicked(self):    
         print("Button 2 clicked")
