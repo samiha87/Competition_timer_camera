@@ -6,7 +6,7 @@ import cv2
 import os
 import array as arr
 import threading
-from Queue import Queue
+import queue
 
 class YoloDetector (threading.Thread):
     def __init__(self, lock, path, vType, yolo, qin, qout, rotate, shift, confidence_lim, treshold_lim, frame_rate):
@@ -27,7 +27,7 @@ class YoloDetector (threading.Thread):
         yolo_detect_start(self, self.path, self.vType, self.yolo, self.qin, self.qout, self.rotation, self.shift, self.confidence_lim, self.treshold_lim, self.frame_rate)
 
 def translateImage(image, offsetx, offsety):
-	rows, cols = image.shape[:2]
+	rows, cols = image.get().shape[:2]
 	M = np.float32([[1,0,offsetx], [0,1,offsety]])
 	dst = cv2.warpAffine(image, M, (cols,rows))
 	return dst
@@ -86,6 +86,7 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
             thread_data = None
         # read the next frame from the file
         (grabbed, frame) = vs.read()
+        frameGPU = cv2.UMat(frame) # Convert to OpenCL format to process through GPU
         frame_count = frame_count + 1
         if(frame_count >= Process_frame):
         	# if the frame was not grabbed, then we have reached the end
@@ -95,17 +96,17 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 
         	# if the frame dimensions are empty, grab them
             if W is None or H is None:
-    		    (H, W) = frame.shape[:2]
-            
+                (H, W) = frameGPU.get().shape[:2]
             #Rotate image
             center = (W / 2, H /2)
             M = cv2.getRotationMatrix2D(center, float(rotate), 1)
-            frame = cv2.warpAffine(frame, M, (H, W))
+            # Not supported on cuda
+            frameGPU = cv2.warpAffine(frameGPU, M, (H, W))
 
             #Translate image 
-            frame = translateImage(frame, shift[0], shift[1])
+            frameGPU = translateImage(frameGPU, shift[0], shift[1])
             
-            blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
+            blob = cv2.dnn.blobFromImage(frameGPU, 1 / 255.0, (416, 416), swapRB=True, crop=False)
             net.setInput(blob)
 
             layerOutputs = net.forward(ln)
@@ -115,10 +116,12 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
             boxes = []
             confidences = []
             classIDs = []
-
-			# loop over each of the layer outputs
+            counter = 0
+			# loop over each of the layer outputs, Can this be refactored
+            # Looping thourgh like this is very slow
             for output in layerOutputs:
                 # loop over each of the detections
+                #print("Output layer size " + str(len(output)))
                 for detection in output:
                     # extract the class ID and confidence (i.e., probability)
                     # of the current object detection
@@ -127,8 +130,10 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                     confidence = scores[classID]
 				    # filter out weak predictions by ensuring the detected
 				    # probability is greater than the treshold probability
+                    counter = counter +1
                     if confidence > confidence_lim:
-                        (Hd, Wd) = frame.shape[:2]
+
+                        (Hd, Wd) = frameGPU.get().shape[:2]
                         box = detection[0:4] * np.array([Wd, Hd, Wd, Hd])
                         (centerXd, centerYd, widthd, heightd) = box.astype("int")
                         x = int(centerXd - (widthd / 2))
@@ -137,8 +142,9 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                         boxes.append([x, y, int(widthd), int(heightd)])
                         confidences.append(float(confidence))
                         classIDs.append(classID)
-                        
-			# apply non-maxima suppression to suppress weak, overlapping
+                        break; # Break because we don't need to loop over rest.
+			
+            # apply non-maxima suppression to suppress weak, overlapping
 		    # bounding boxes
             idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence_lim, treshold_lim)
             if(block_gate and ( (time.time() - block_gate_timer) > 5)):
@@ -148,7 +154,7 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 				# loop over the indexes we are keeping
                 for i in idxs.flatten():
 				    # extract the bounding box coordinates
-                    (H, W) = frame.shape[:2]
+                    (H, W) = frameGPU.get().shape[:2]
                     (x, y) = (boxes[i][0], boxes[i][1])
                     (w, h) = (boxes[i][2], boxes[i][3])
                     Detection_count = Detection_count + 1
@@ -166,8 +172,8 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                                 print("Time elapsed {:.4f} seconds".format(elap))
                                 timer_running = False
         # get Heigh and width
-        if frame  is not None:
-            (H_, W_) = frame.shape[:2]	
+        #if frameGPU is not None:
+        #    (H_, W_) = frameGPU.get().shape[:2]	
         # Draw line middle of frame
         if frame_count >= frame_rate:
             frame_count = 0

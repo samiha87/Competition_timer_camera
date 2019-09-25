@@ -7,7 +7,7 @@ import cv2
 import os
 import array as arr
 import threading
-from Queue import Queue
+import queue
 from yolo_detect import YoloDetector
 
 # Find frames
@@ -173,8 +173,8 @@ def yolo_detect_both(video_path_start, video_path_end, video_type, yolo, rotate,
 		print("yolo_detect_both() Wrong type " + video_type)
 		return
 
-	queue_start = Queue()
-	queue_end = Queue()
+	queue_start = queue.Queue()
+	queue_end = queue.Queue()
 	# Create a lock
 	lock = threading.Lock()
 	# Create threads, First queue input is to transmit, second to read
