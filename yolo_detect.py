@@ -1,3 +1,4 @@
+
 import numpy as np
 import argparse
 import imutils
@@ -40,14 +41,9 @@ def storeFile(image, path) :
     cv2.imwrite(path, image, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
 
 def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_output, rotate, shift, confidence_lim, treshold_lim, frame_rate):
-    # load the COCO class labels our YOLO model was trained o
-    print(video_type + " Treshold " + str(confidence_lim))
-    labelsPath = os.path.sep.join([yolo, "coco.names"])
-    LABELS = open(labelsPath).read().strip().split("\n")
 	# initialize a list of colors to represent each possible class label
     np.random.seed(42)
-    COLORS = np.random.randint(0, 255, size=(len(LABELS), 3), dtype="uint8")
-
+    loopTimeStart = time.time() 
 	# derive the paths to the YOLO weights and model configuration
     weightsPath = os.path.sep.join([yolo, "yolov3.weights"])
     configPath = os.path.sep.join([yolo, "yolov3.cfg"])
@@ -58,17 +54,19 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
     ln = net.getLayerNames()
     ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
-	    # initialize the video stream, pointer to output video file, and
-	    # frame dimensions
-    print("Reading video file " + video_type)
+	# initialize the video stream, pointer to output video file, and
+	# frame dimensions
     vs = cv2.VideoCapture(video_path)	# Read video
-	    # Get dimensions from video start footage
-    video_width = vs.get(cv2.CAP_PROP_FRAME_WIDTH)
-    video_height = vs.get(cv2.CAP_PROP_FRAME_HEIGHT)
-
+    # Sizes of video stays stable we only need to pull them once
+    # When pulling Frame and video width from GPU this causes slow down
+    # OpenCV has to convert the gpu data to cpu data and this causes slow down
+    # We change these values only if needed
+    # Doing this increased performance majorily
     writer = None
     (W, H) = (None, None)
-
+    (W2, H2) = (None, None)
+    (W3, H3) = (None, None)
+    (W4, H4) = (None, None)
     Detection_count = 1
     Process_frame = frame_rate
     frame_count = 0
@@ -77,10 +75,9 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
     timer_running = False
     # Init timers
     start = 0
-    end = 0
 
-    print("Starting detection " + video_type)
     while True:
+        
         #check queue if we have message from another thread
         try:
             thread_data = queue_input.get(False)
@@ -90,6 +87,7 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                 timer_running = True
         except:
             thread_data = None
+
         # read the next frame from the file
         (grabbed, frame) = vs.read()
         frameGPU = cv2.UMat(frame) # Convert to OpenCL format to process through GPU
@@ -111,12 +109,10 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 
             #Translate image 
             frameGPU = translateImage(frameGPU, shift[0], shift[1])
-            
             blob = cv2.dnn.blobFromImage(frameGPU, 1 / 255.0, (416, 416), swapRB=True, crop=False)
             net.setInput(blob)
 
             layerOutputs = net.forward(ln)
-            end = time.time()
 
             # initialize our lists of detected bounding boxes, confidences, and class IDs, respectively
             boxes = []
@@ -138,9 +134,9 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 				    # probability is greater than the treshold probability
                     counter = counter +1
                     if confidence > confidence_lim:
-
-                        (Hd, Wd) = frameGPU.get().shape[:2]
-                        box = detection[0:4] * np.array([Wd, Hd, Wd, Hd])
+                        if W2 is None or H2 is None:
+                            (H2, W2) = frameGPU.get().shape[:2]
+                        box = detection[0:4] * np.array([W2, H2, W2, H2])
                         (centerXd, centerYd, widthd, heightd) = box.astype("int")
                         x = int(centerXd - (widthd / 2))
                         y = int(centerYd - (heightd / 2))
@@ -148,23 +144,23 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                         boxes.append([x, y, int(widthd), int(heightd)])
                         confidences.append(float(confidence))
                         classIDs.append(classID)
-                        break; # Break because we don't need to loop over rest.
+                        break # Break because we don't need to loop over rest.
 			
             # apply non-maxima suppression to suppress weak, overlapping
 		    # bounding boxes
             idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence_lim, treshold_lim)
-            if(block_gate and ( (time.time() - block_gate_timer) > 5)):
-                block_gate = False
 		    # ensure at least one detection exists
             if (len(idxs) > 0 and (block_gate == False)):
 				# loop over the indexes we are keeping
                 for i in idxs.flatten():
 				    # extract the bounding box coordinates
-                    (H, W) = frameGPU.get().shape[:2]
+                    # Do this only once
+                    if W3 is None or H3 is None:
+                        (H3, W3) = frameGPU.get().shape[:2]
                     (x, y) = (boxes[i][0], boxes[i][1])
                     (w, h) = (boxes[i][2], boxes[i][3])
                     Detection_count = Detection_count + 1
-                    if (x < W/2) and ( (x + w) > W/2):
+                    if (x < W3/2) and ( (x + w) > W3/2):
                         if(video_type is "start") :
                             print("Person crossed start ", Detection_count)
                             # Send start time to end gate
@@ -177,13 +173,14 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                                 elap = (stop - start)
                                 print("Time elapsed {:.4f} seconds".format(elap))
                                 timer_running = False
-  
+
         if frame_count >= frame_rate:
             frame_count = 0
-            path = "buffer/buffer" + video_type + ".jpg"
-            storeFile(frameGPU, path)
-		# release the file pointers
-    print("Detection ended for " + video_type)
+            #path = "buffer/buffer" + video_type + ".jpg"
+            #storeFile(frameGPU, path)
+	# release the file pointers
     if writer is not None:
         writer.release()
     vs.release()
+    elapsedTime = time.time() - loopTimeStart 
+    print("\nProcess took = " + str(elapsedTime) + " " + video_type)

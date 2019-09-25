@@ -25,14 +25,15 @@ class App():
         self.videoTimer.timeout.connect(self.updateStream)
 
     def updateStream(self):
-        self.pixmapEnd.load("buffer/bufferend.jpg")
-        self.pixmapStart.load("buffer/bufferstart.jpg")
+        return
+        #self.pixmapEnd.load("buffer/bufferend.jpg")
+        #self.pixmapStart.load("buffer/bufferstart.jpg")
 
-        self.pixmapEnd = self.pixmapEnd.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
-        self.labelEnd.setPixmap(self.pixmapEnd)    
+        #self.pixmapEnd = self.pixmapEnd.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        #self.labelEnd.setPixmap(self.pixmapEnd)    
   
-        self.pixmapStart = self.pixmapStart.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
-        self.labelStart.setPixmap(self.pixmapStart)
+        #self.pixmapStart = self.pixmapStart.scaled(500, 500, QtCore.Qt.KeepAspectRatio)
+        #self.labelStart.setPixmap(self.pixmapStart)
 
     def start(self):
 

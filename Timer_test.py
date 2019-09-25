@@ -26,6 +26,8 @@ args = vars(ap.parse_args())
 
 
 if args["gui"]:
+	# Ensure we use optimized settings
+		cv2.setUseOptimized(True)
 		print("Start GUI")
 		# Init GUI
 		gui = App()
