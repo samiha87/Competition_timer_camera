@@ -6,7 +6,7 @@ import time
 import cv2
 import os
 import threading
-from GUIManagement import startGui
+from GUIManagement import App
 from detectors import yolo_detect, yolo_detect_both, color_detect, movement_detect
 
 ap = argparse.ArgumentParser()
@@ -23,13 +23,12 @@ ap.add_argument("-l", "--treshold", 	type=float, 		default=0.3,							help="thre
 ap.add_argument("-f", "--framerate", 	type=int,	 		default=5,								help="Frame rate to process images")
 args = vars(ap.parse_args())
 
+
 if args["type"] == "yolo":
-	print("Start GUI")
-	startGui()
 	if args["mode"] == "both":
 		#start yolo detector for start gate in thread
 		yolo_detect_both(args["inputstart"], args["inputend"], args["mode"], args["yolo"], args["rotate"], args["translate"], args["confidence"], args["treshold"], args["framerate"])
-
+		
 	if args["mode"] == "start":
 		yolo_detect(args["inputstart"], args["mode"], args["yolo"], args["rotate"], args["translate"], args["confidence"], args["treshold"], args["framerate"]) 
 
@@ -41,4 +40,8 @@ if args["type"] == "movement":
 		movement_detect(args["inputstart"], args["mode"], True)
 	else :
 		movement_detect(args["inputstart"], args["mode"], False)
-#
+
+# Init GUI
+gui = App()
+# Start gui
+gui.start()

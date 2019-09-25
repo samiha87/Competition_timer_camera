@@ -1,8 +1,8 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt5.QtGui import QIcon, QPixmap
 
-class App(QWidget):
+class App():
 
     def __init__(self):
         super().__init__()
@@ -11,25 +11,45 @@ class App(QWidget):
         self.top = 10
         self.width = 640
         self.height = 480
-        self.initUI()
+        self.gui = QApplication([])
+        self.widget = QWidget()
     
-    def startGUI(self):
-        self.setWindowTitle(self.title)
-        self.setGeometry(self.left, self.top, self.width, self.height)
-    
-        # Create widget
-        labelStart = QLabel(self)
-        labelEnd = QLabel(self)
+    def start(self):
+
+        self.widget.setWindowTitle(self.title)
+        self.widget.setGeometry(self.left, self.top, self.width, self.height)
+        # Create layout
+        layoutMain = QVBoxLayout()
+        layoutVideo = QHBoxLayout()
+        layoutButton = QHBoxLayout()
+        
+        # Create buttons
+        startButton = QPushButton('Start')
+        stopButton = QPushButton('End')
+        exitButton = QPushButton('Exit')
+        # Create Start and Stop windows
+        labelStart = QLabel()
+        labelEnd = QLabel()
+
         pixmapStart = QPixmap('startFrame.jpeg')
         pixmapEnd = QPixmap('startEnd.jpeg')
+
         labelStart.setPixmap(pixmapStart)
         labelEnd.setPixmap(pixmapEnd)
+
+        layoutVideo.addWidget(labelStart)
+        layoutVideo.addWidget(labelEnd)
+
+        layoutButton.addWidget(startButton)
+        layoutButton.addWidget(stopButton)
+        layoutButton.addWidget(exitButton)
+
+        # Init layout
+        layoutMain.addLayout(layoutVideo)
+        layoutMain.addLayout(layoutButton)
+        self.widget.setLayout(layoutMain)
         screenWidth = 1024
         screenHeight = 800
-        self.resize(screenWidth, screenHeight)
-        self.show()
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = App()
-    sys.exit(app.exec_())
+        self.widget.resize(screenWidth, screenHeight)
+        self.widget.show()
+        self.gui.exec_()
