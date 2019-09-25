@@ -5,7 +5,6 @@ import imutils
 import time
 import cv2
 import os
-import threading
 from GUIManagement import App
 from detectors import yolo_detect, yolo_detect_both, color_detect, movement_detect
 

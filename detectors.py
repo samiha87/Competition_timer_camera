@@ -6,8 +6,7 @@ import time
 import cv2
 import os
 import array as arr
-import threading
-import queue
+from multiprocessing  import Process, Queue, Lock
 from yolo_detect import YoloDetector
 
 startFrame = None
@@ -183,22 +182,19 @@ def yolo_detect_both(video_path_start, video_path_end, video_type, yolo, rotate,
 		print("yolo_detect_both() Wrong type " + video_type)
 		return
 
-	queue_start = queue.Queue()
-	queue_end = queue.Queue()
+	queue_start = Queue()
+	queue_end = Queue()
 
 	# Create a lock
-	lock = threading.Lock()
+	lock = Lock()
 	# Create threads, First queue input is to transmit, second to read
-	startThread = YoloDetector(lock, video_path_start, "start", yolo, queue_end, queue_start, rotate, shift, confidence_lim, treshold_lim, frame_rate)
-	endThread	= YoloDetector(lock, video_path_end, "end", yolo, queue_start, queue_end, rotate, shift, confidence_lim, treshold_lim, frame_rate)
+	startProcess = YoloDetector(lock, video_path_start, "start", yolo, queue_end, queue_start, rotate, shift, confidence_lim, treshold_lim, frame_rate)
+	endProcess	= YoloDetector(lock, video_path_end, "end", yolo, queue_start, queue_end, rotate, shift, confidence_lim, treshold_lim, frame_rate)
 	# Start monitoring end gate
-	startThread.start()
+	startProcess.start()
 	time.sleep(10)
 	# Start monitoring start gate
-	endThread.start()
-	# Join queue
-	queue_start.join()
-	queue_end.join()
+	endProcess.start()
 
 def translateImage(image, offsetx, offsety):
 	rows, cols = image.shape[:2]

@@ -6,14 +6,12 @@ import time
 import cv2
 import os
 import array as arr
-import threading
-import queue
+from multiprocessing  import Process, Queue, Lock
 import sys
 
-
-class YoloDetector (threading.Thread):
+class YoloDetector (Process):
     def __init__(self, lock, path, vType, yolo, qin, qout, rotate, shift, confidence_lim, treshold_lim, frame_rate):
-        threading.Thread.__init__(self)
+        Process.__init__(self)
         self.lock = lock
         self.path = path
         self.vType = vType
@@ -32,7 +30,7 @@ class YoloDetector (threading.Thread):
         sys.exit()
 
 def translateImage(image, offsetx, offsety):
-	rows, cols = image.get().shape[:2]
+	rows, cols = image.shape[:2]
 	M = np.float32([[1,0,offsetx], [0,1,offsety]])
 	dst = cv2.warpAffine(image, M, (cols,rows))
 	return dst
@@ -42,6 +40,7 @@ def storeFile(image, path) :
 
 def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_output, rotate, shift, confidence_lim, treshold_lim, frame_rate):
 	# initialize a list of colors to represent each possible class label
+    cv2.ocl.setUseOpenCL(False)
     np.random.seed(42)
     loopTimeStart = time.time() 
 	# derive the paths to the YOLO weights and model configuration
@@ -66,7 +65,7 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
     (W, H) = (None, None)
     (W2, H2) = (None, None)
     (W3, H3) = (None, None)
-    (W4, H4) = (None, None)
+
     Detection_count = 1
     Process_frame = frame_rate
     frame_count = 0
@@ -90,7 +89,11 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 
         # read the next frame from the file
         (grabbed, frame) = vs.read()
-        frameGPU = cv2.UMat(frame) # Convert to OpenCL format to process through GPU
+        #try:
+        #    frameGPU = cv2.UMat(frame) # Convert to OpenCL format to process through GPU
+        #except:
+        #   continue
+        
         frame_count = frame_count + 1
         if(frame_count >= Process_frame):
         	# if the frame was not grabbed, then we have reached the end
@@ -100,16 +103,15 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 
         	# if the frame dimensions are empty, grab them
             if W is None or H is None:
-                (H, W) = frameGPU.get().shape[:2]
+                (H, W) = frame.shape[:2]
             #Rotate image
             center = (W / 2, H /2)
             M = cv2.getRotationMatrix2D(center, float(rotate), 1)
             # Not supported on cuda
-            frameGPU = cv2.warpAffine(frameGPU, M, (H, W))
-
+            frame = cv2.warpAffine(frame, M, (H, W))
             #Translate image 
-            frameGPU = translateImage(frameGPU, shift[0], shift[1])
-            blob = cv2.dnn.blobFromImage(frameGPU, 1 / 255.0, (416, 416), swapRB=True, crop=False)
+            frame = translateImage(frame, shift[0], shift[1])
+            blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
             net.setInput(blob)
 
             layerOutputs = net.forward(ln)
@@ -135,7 +137,7 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
                     counter = counter +1
                     if confidence > confidence_lim:
                         if W2 is None or H2 is None:
-                            (H2, W2) = frameGPU.get().shape[:2]
+                            (H2, W2) = frame.shape[:2]
                         box = detection[0:4] * np.array([W2, H2, W2, H2])
                         (centerXd, centerYd, widthd, heightd) = box.astype("int")
                         x = int(centerXd - (widthd / 2))
@@ -156,7 +158,7 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 				    # extract the bounding box coordinates
                     # Do this only once
                     if W3 is None or H3 is None:
-                        (H3, W3) = frameGPU.get().shape[:2]
+                        (H3, W3) = frame.shape[:2]
                     (x, y) = (boxes[i][0], boxes[i][1])
                     (w, h) = (boxes[i][2], boxes[i][3])
                     Detection_count = Detection_count + 1
@@ -176,8 +178,6 @@ def yolo_detect_start(self, video_path, video_type, yolo, queue_input, queue_out
 
         if frame_count >= frame_rate:
             frame_count = 0
-            #path = "buffer/buffer" + video_type + ".jpg"
-            #storeFile(frameGPU, path)
 	# release the file pointers
     if writer is not None:
         writer.release()
